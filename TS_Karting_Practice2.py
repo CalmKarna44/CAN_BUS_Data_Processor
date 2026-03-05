@@ -70,30 +70,6 @@ print("Fastest Lap Number:", get_stats["fastest_lap_number"])
 print("Fastest:", get_stats["fastest_lap"])
 print("Consistency:", round(get_stats["std_deviation"], 3))
 
-# ~~~~~ Two different plots way of doing things ~~~~~~
-
-# plt.figure()
-# plt.plot(lap_numbers, laps_clean, marker='o', label='All laps')
-# plt.xlabel("Lap Number")
-# plt.ylabel("Lap Time (s)")
-# plt.title("All Laps")
-# plt.xticks(lap_numbers)
-# plt.legend()
-# plt.grid(True)
-# plt.show()
-
-# plt.figure()
-# mask = ~np.isnan(laps_fast)
-# plt.plot(lap_numbers[mask], laps_fast[mask], linestyle="--", marker="x", label='Fast laps (≤40s)')
-# plt.axhline(get_stats["avg"] , linestyle ="--", color = "red", label = f"Average Pace:{np.nanmean(laps_fast):.3f}s")
-# plt.xlabel("Lap Number")
-# plt.ylabel("Lap Time (s)")
-# plt.title("Fast laps (<= 40s)")
-# plt.xticks(lap_numbers)
-# plt.legend()
-# plt.grid(True)
-# plt.show()
-
 # Plotting of results.
 
 fig, axes = plt.subplots(2, 1, sharex=True, figsize=(12, 8))
