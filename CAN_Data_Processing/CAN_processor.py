@@ -4,6 +4,9 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go 
 from plotly.subplots import make_subplots
+import tkinter as tk 
+from tkinter import filedialog
+import os 
 
 def load_dbc(dbc_path):
     db = cantools.database.load_file(dbc_path)
@@ -70,7 +73,7 @@ def plot_signals(decoded_df, signals, title='OBD2 Data'):
     fig = make_subplots(
         rows             = len(signals),
         cols             = 1,
-        shared_xaxes     = True,
+        shared_xaxes     = False,
         subplot_titles   = signals,
         vertical_spacing = 0.05
     )
@@ -94,22 +97,49 @@ def plot_signals(decoded_df, signals, title='OBD2 Data'):
     fig.update_layout(
         title         = title,
         height        = 250 * len(signals),
+        width         = 500 * len(signals),
         plot_bgcolor  = 'white',
         paper_bgcolor = 'white'
     )
 
     fig.update_xaxes(
         showgrid  = True,
-        gridcolor = 'rgba(128, 128, 128, 0.3)',
-        gridwidth = 0.5
+        gridcolor = 'black',
+        gridwidth = 0.5, 
+        layer     = 'below traces',
+        title_text='Time (seconds)', 
+        row=len(signals), 
+        col=1
     )
     fig.update_yaxes(
         showgrid  = True,
-        gridcolor = 'rgba(128, 128, 128, 0.3)',
+        gridcolor = 'black',
         gridwidth = 0.5,
         layer     = 'below traces'
     )
-
-    fig.update_xaxes(title_text='Time (seconds)', row=len(signals), col=1)
     fig.show()
         
+def file_save(decoded_df):
+    root = tk.Tk()
+    root.withdraw()
+
+    folder_path = filedialog.askdirectory(title = "Select folder to save the csv.")
+    print (f"Selected folder: {folder_path}")
+
+    if not folder_path: 
+        print("Save cancelled - No folder selected.")
+        return 
+
+    file_name = input("Please input file name without .csv: ")
+    print(f"File name will be saved as {file_name}.csv")
+
+    if not file_name.strip():
+        print ("Save cancelled - No file name given")
+        return
+
+    file_path = os.path.join (folder_path, f"{file_name}.csv")
+    
+    decoded_df.to_csv(file_path)
+    print(f"Saved to : {file_path}")
+    print (f"Number of rows: {len(decoded_df)}")
+    print (f"Columns : {list(decoded_df.columns)}")
