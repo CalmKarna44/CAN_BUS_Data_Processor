@@ -17,18 +17,13 @@ def load_dbc(dbc_path):
 def load_mf4(mf4_path): 
     mdf = MDF(mf4_path)
     raw_df = mdf.to_dataframe()
-    raw_df = raw_df.rename(columns={
-        'CAN_DataFrame.CAN_DataFrame.ID'         : 'ID',
-        'CAN_DataFrame.CAN_DataFrame.DataBytes'  : 'DataBytes',
-        'CAN_DataFrame.CAN_DataFrame.DataLength' : 'DataLength',
-        'CAN_DataFrame.CAN_DataFrame.Dir'        : 'Dir',
-        'CAN_DataFrame.CAN_DataFrame.BusChannel' : 'BusChannel', 
-        'CAN_DataFrame.CAN_DataFrame.IDE'        : 'IDE', 
-        'CAN_DataFrame.CAN_DataFrame.DLC'        : 'DLC', 
-        'CAN_DataFrame.CAN_DataFrame.EDL'        : 'EDL',
-        'CAN_DataFrame.CAN_DataFrame.BRS'        : 'BRS'
+    rename_map = {}
+    for col in raw_df.columns:
+        short_name = col.split('.')[-1]
+        rename_map[col] = short_name
+        
+    raw_df = raw_df.rename(columns=rename_map)
 
-    })
     print (f"MF4 loaded : {mf4_path}")
     print(f"Total frames  : {len(raw_df)}")
     print(f"Time range    : {raw_df.index[0]}s → {raw_df.index[-1]}s")
@@ -58,10 +53,21 @@ def decode_obd2(obd2_df, db, can_id = 0x7E8):
     decoded_df = pd.DataFrame(decoded_records)
     decoded_df = decoded_df.set_index("timestamps")
 
-    print (f"Decoded Signals : {len(decoded_df)}")
-    print(f"Signals found : {list(decoded_df.columns)}")
+    real_signals = []
+    for message in db.messages:
+        for sig in message.signals:
+            if sig.unit is not None: 
+                real_signals.append(sig.name)
 
-    return decoded_df
+    signals_found = []
+    for col in decoded_df.columns:
+        if col in real_signals:
+            signals_found.append(col)
+
+    print(f"Real signals found : {signals_found}")        
+    print (f"Decoded Signals : {len(decoded_df)}")
+
+    return decoded_df, signals_found
 
 def plot_signals(decoded_df, signals, title='OBD2 Data'):
 
@@ -115,11 +121,12 @@ def plot_signals(decoded_df, signals, title='OBD2 Data'):
         showgrid  = True,
         gridcolor = 'black',
         gridwidth = 0.5,
-        layer     = 'below traces'
+        layer     = 'below traces',
+
     )
     fig.show()
         
-def file_save(decoded_df):
+def file_save(decoded_df, signals_found):
     root = tk.Tk()
     root.withdraw()
 
@@ -139,7 +146,7 @@ def file_save(decoded_df):
 
     file_path = os.path.join (folder_path, f"{file_name}.csv")
     
-    decoded_df.to_csv(file_path)
+    decoded_df[signals_found].to_csv(file_path)
     print(f"Saved to : {file_path}")
     print (f"Number of rows: {len(decoded_df)}")
     print (f"Columns : {list(decoded_df.columns)}")
