@@ -1,4 +1,4 @@
-from CAN_processor import load_dbc, load_mf4, decode_obd2,filter_obd2, plot_signals, file_save
+from CAN_processor import load_dbc, load_mf4, decode_obd2,filter_obd2, plot_signals, file_save, signal_stats
 
 DBC_PATH = r"C:\Users\dell\Desktop\MBGP Mentoring\Programming\Excel Data\obd2-pack-v5\obd2-dbc\CSS-Electronics-11-bit-OBD2-v2.2.dbc"
 MF4_PATH = r"C:\Users\dell\Desktop\MBGP Mentoring\Programming\Excel Data\obd2-pack-v5\obd2-sample-data\2015 Chevrolet Tahoe\00000001.MF4"
@@ -10,6 +10,8 @@ print(raw_df.columns)
 obd2_df = filter_obd2(raw_df)
 
 decoded_df, signals_found = decode_obd2(obd2_df, db)
+
+stats = signal_stats(decoded_df, signals_found)
 
 signals_to_plot = [
 'S01PID10_MAFAirFlowRate', 

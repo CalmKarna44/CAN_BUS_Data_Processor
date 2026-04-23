@@ -69,6 +69,24 @@ def decode_obd2(obd2_df, db, can_id = 0x7E8):
 
     return decoded_df, signals_found
 
+def signal_stats(decoded_df, signal_found):
+    stats_store = {}
+    for signals in signal_found:
+        stats = decoded_df[signals].dropna().describe()
+        stats_store[signals] = stats
+
+    for sig_name, stats in stats_store.items():
+        print (f"--- {sig_name} ---")
+        print (f" Samples             : {int(stats["count"])}")
+        print (f" Min Value           : {stats["min"]:.2f}")
+        print (f" Max Value           : {stats["max"]:.2f}")
+        print (f" Mean Value          : {stats["mean"]:.2f}")
+        print (f" Median Value        : {stats["50%"]:.2f}")
+        print (f" Std deviation Value : {stats["std"]:.2f}")
+        print ()
+
+    return stats_store
+
 def plot_signals(decoded_df, signals, title='OBD2 Data'):
 
     colours = [
