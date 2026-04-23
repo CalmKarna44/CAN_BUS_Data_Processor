@@ -14,6 +14,22 @@ def load_dbc(dbc_path):
     print (f"Messages : {len(db.messages)}")
     return db 
 
+def select_file():
+    root = tk.Tk()
+    root.withdraw()
+
+    open_file_path = filedialog.askopenfilename(
+        title="Select MF4 File",
+        filetypes=[("MF4 files", "*.MF4")]
+    )
+
+    if not open_file_path: 
+        print("No file selected.")
+        return 
+    
+    print (f"Selected file : {open_file_path}")
+    return open_file_path
+
 def load_mf4(mf4_path): 
     mdf = MDF(mf4_path)
     raw_df = mdf.to_dataframe()
@@ -33,6 +49,10 @@ def load_mf4(mf4_path):
 def filter_obd2(raw_df, can_id = 0x7E8):
     obd2_df = raw_df[raw_df["ID"]==can_id].copy()
     print (f"OBD2 Frames : {len(obd2_df)}  (ID= {can_id})")
+
+    if obd2_df.empty:
+        print ("No OBD2 frames found in the selected MF4 file")
+        return None
 
     return obd2_df
 
