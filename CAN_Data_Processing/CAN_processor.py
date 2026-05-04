@@ -81,7 +81,9 @@ def decode_raw_can(raw_df, db):
     print (f"Skipped Frames : {skipped}")
     print (f"Signals Found : {list(decoded_df.columns)}")
 
-    return decoded_df
+    signals_found = list(decoded_df.columns)
+
+    return decoded_df, signals_found
 
 
 # def filter_obd2(raw_df, can_id = 0x7E8):
@@ -95,37 +97,37 @@ def decode_raw_can(raw_df, db):
 #     return obd2_df
 
 # def decode_obd2(obd2_df, db, can_id = 0x7E8):
-#     decoded_records = []
+#     decoded_obd2_records = []
 #     for timestamp, row in obd2_df.iterrows():
 #         raw_bytes = bytes(row["DataBytes"])
 
 #         try: 
-#             decoded = db.decode_message(can_id, data = raw_bytes, decode_choices = False)
-#             decoded["timestamps"] = timestamp
-#             decoded_records.append(decoded)
+#             decoded_obd2 = db.decode_message(can_id, data = raw_bytes, decode_choices = False)
+#             decoded_obd2["timestamps"] = timestamp
+#             decoded_obd2_records.append(decoded_obd2)
 
 #         except Exception as e: 
 #             print(f"Could not decode frame at {timestamp:.4f}s : {e}")
 #             pass
 
-#     decoded_df = pd.DataFrame(decoded_records)
-#     decoded_df = decoded_df.set_index("timestamps")
+#     decoded_obd2_df = pd.DataFrame(decoded_obd2_records)
+#     decoded_obd2_df = decoded_obd2_df.set_index("timestamps")
 
-#     real_signals = []
+#     real_obd2_signals = []
 #     for message in db.messages:
 #         for sig in message.signals:
 #             if sig.unit is not None: 
-#                 real_signals.append(sig.name)
+#                 real_obd2_signals.append(sig.name)
 
-#     signals_found = []
-#     for col in decoded_df.columns:
-#         if col in real_signals:
-#             signals_found.append(col)
+#     obd2_signals_found = []
+#     for col in decoded_obd2_df.columns:
+#         if col in real_obd2_signals:
+#             obd2_signals_found.append(col)
 
-#     print(f"Real signals found : {signals_found}")        
-#     print (f"Decoded Signals : {len(decoded_df)}")
+#     print(f"Real signals found : {obd2_signals_found}")        
+#     print (f"Decoded Signals : {len(decoded_obd2_df)}")
 
-#     return decoded_df, signals_found
+#     return decoded_obd2_df, obd2_signals_found
 
 def signal_stats(decoded_df, signal_found):
     stats_store = {}
@@ -145,7 +147,43 @@ def signal_stats(decoded_df, signal_found):
 
     return stats_store
 
-def plot_signals(decoded_df, signals, title='OBD2 Data'):
+def signal_selector(signals_found):
+    root = tk.Tk()
+    root.title("Select Signals to Plot")
+    root.geometry("400x500")
+
+    tk.Label(root, text="Select signals to plot: ").pack(pady=5)
+
+    listbox = tk.Listbox(
+        root,
+        selectmode= tk.MULTIPLE, 
+        width=50,
+        height= 20
+        )
+    listbox.pack(pady=5)
+
+    for sig in signals_found:
+        listbox.insert(tk.END, sig)
+
+    selected_signals = []
+
+    def on_confirm():
+        selected_indices = listbox.curselection()
+        for i in selected_indices:
+            selected_signals.append(signals_found[i])
+        root.quit()
+
+    tk.Button(root, text="Confirm", command = on_confirm).pack(pady=5)
+
+    
+    root.mainloop()
+    root.destroy()
+
+    print (f"Selected: {selected_signals}")
+    
+    return selected_signals
+
+def plot_signals(decoded_df, signals, title='CAN Data'):
 
     colours = [
         'red', 'blue', 'green', 'indigo',
@@ -157,7 +195,7 @@ def plot_signals(decoded_df, signals, title='OBD2 Data'):
         cols             = 1,
         shared_xaxes     = False,
         subplot_titles   = signals,
-        vertical_spacing = 0.05
+        vertical_spacing = 0.01
     )
 
     for i, sig_name in enumerate(signals):
@@ -178,7 +216,7 @@ def plot_signals(decoded_df, signals, title='OBD2 Data'):
 
     fig.update_layout(
         title         = title,
-        height        = 250 * len(signals),
+        height        = 150 * len(signals),
         width         = 500 * len(signals),
         plot_bgcolor  = 'white',
         paper_bgcolor = 'white'
