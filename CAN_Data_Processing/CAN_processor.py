@@ -46,48 +46,86 @@ def load_mf4(mf4_path):
 
     return raw_df
 
-def filter_obd2(raw_df, can_id = 0x7E8):
-    obd2_df = raw_df[raw_df["ID"]==can_id].copy()
-    print (f"OBD2 Frames : {len(obd2_df)}  (ID= {can_id})")
+def decode_raw_can(raw_df, db):
+    dbc_ids = {int(message.frame_id): message for message in db.messages}
 
-    if obd2_df.empty:
-        print ("No OBD2 frames found in the selected MF4 file")
-        return None
-
-    return obd2_df
-
-def decode_obd2(obd2_df, db, can_id = 0x7E8):
     decoded_records = []
-    for timestamp, row in obd2_df.iterrows():
+    skipped = 0 
+
+    for timestamp, row in raw_df.iterrows():
+        frame_id = int(row["ID"])
         raw_bytes = bytes(row["DataBytes"])
 
-        try: 
-            decoded = db.decode_message(can_id, data = raw_bytes, decode_choices = False)
-            decoded["timestamps"] = timestamp
+        if frame_id not in dbc_ids:
+            skipped += 1
+            continue
+
+        try:
+            decoded = db.decode_message(frame_id, raw_bytes, decode_choices = False)
+            decoded["timestamp"] = timestamp
+            decoded["message"] = dbc_ids[frame_id].name
             decoded_records.append(decoded)
 
-        except Exception as e: 
-            print(f"Could not decode frame at {timestamp:.4f}s : {e}")
-            pass
+        except Exception as e:
+            skipped += 1
+    
+    if not decoded_records:
+        print("No frames were decoded — check DBC matches MF4")
+        return None, []
 
     decoded_df = pd.DataFrame(decoded_records)
-    decoded_df = decoded_df.set_index("timestamps")
+    decoded_df = decoded_df.set_index("timestamp")
 
-    real_signals = []
-    for message in db.messages:
-        for sig in message.signals:
-            if sig.unit is not None: 
-                real_signals.append(sig.name)
+    print (f"Total Frames : {len(raw_df)}")
+    print (f"Decoded Frames : {len(decoded_records)}")
+    print (f"Skipped Frames : {skipped}")
+    print (f"Signals Found : {list(decoded_df.columns)}")
 
-    signals_found = []
-    for col in decoded_df.columns:
-        if col in real_signals:
-            signals_found.append(col)
+    return decoded_df
 
-    print(f"Real signals found : {signals_found}")        
-    print (f"Decoded Signals : {len(decoded_df)}")
 
-    return decoded_df, signals_found
+# def filter_obd2(raw_df, can_id = 0x7E8):
+#     obd2_df = raw_df[raw_df["ID"]==can_id].copy()
+#     print (f"OBD2 Frames : {len(obd2_df)}  (ID= {can_id})")
+
+#     if obd2_df.empty:
+#         print ("No OBD2 frames found in the selected MF4 file")
+#         return None
+
+#     return obd2_df
+
+# def decode_obd2(obd2_df, db, can_id = 0x7E8):
+#     decoded_records = []
+#     for timestamp, row in obd2_df.iterrows():
+#         raw_bytes = bytes(row["DataBytes"])
+
+#         try: 
+#             decoded = db.decode_message(can_id, data = raw_bytes, decode_choices = False)
+#             decoded["timestamps"] = timestamp
+#             decoded_records.append(decoded)
+
+#         except Exception as e: 
+#             print(f"Could not decode frame at {timestamp:.4f}s : {e}")
+#             pass
+
+#     decoded_df = pd.DataFrame(decoded_records)
+#     decoded_df = decoded_df.set_index("timestamps")
+
+#     real_signals = []
+#     for message in db.messages:
+#         for sig in message.signals:
+#             if sig.unit is not None: 
+#                 real_signals.append(sig.name)
+
+#     signals_found = []
+#     for col in decoded_df.columns:
+#         if col in real_signals:
+#             signals_found.append(col)
+
+#     print(f"Real signals found : {signals_found}")        
+#     print (f"Decoded Signals : {len(decoded_df)}")
+
+#     return decoded_df, signals_found
 
 def signal_stats(decoded_df, signal_found):
     stats_store = {}
