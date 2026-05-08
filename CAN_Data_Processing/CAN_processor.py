@@ -8,21 +8,30 @@ import tkinter as tk
 from tkinter import filedialog
 import os 
 
-def load_dbc(dbc_path):
+def load_dbc(dbc_path):                                       
+    
+    # Explaination: Load the proprietary database to return cantools database for decoding all CAN Signals
+ 
     db = cantools.database.load_file(dbc_path)
     print (f"Propritery DBC loaded : {dbc_path}")
     print (f"Propritery DBC Messages : {len(db.messages)}")
 
     return db
 
-def load_obd2_dbc(obd2_dbc_path):
+def load_obd2_dbc(obd2_dbc_path):    
+
+    # Explaination: Similar to above but now loading the OBD2 database for decoding OBD2 signals
+
     obd2_db = cantools.database.load_file(obd2_dbc_path)
     print (f"OBD2 DBC loaded : {obd2_dbc_path}")
     print (f"OBD2 DBC Messages : {len(obd2_db.messages)}")
 
     return obd2_db
 
-def select_file():
+def select_file():  
+
+    # Explaination: Open a GUI file picker for MF4 file selection. It returns selected file path or None if cancelled. 
+
     root = tk.Tk()
     root.withdraw()
 
@@ -39,6 +48,9 @@ def select_file():
     return open_file_path
 
 def load_mf4(mf4_path): 
+
+    # Explaintion: Load an MF4 file and return a normalised raw CAN DataFrame. Column names are shortened by removing asammdf prefixes.
+
     mdf = MDF(mf4_path)
     raw_df = mdf.to_dataframe()
     rename_map = {}
@@ -55,6 +67,9 @@ def load_mf4(mf4_path):
     return raw_df
 
 def decode_raw_can(raw_df, db):
+
+    # Explaination:  Decode raw CAN frames directly against a proprietary DBC. Each frame ID maps directly to a message in the DBC.
+
     dbc_ids = {int(message.frame_id): message for message in db.messages}
 
     decoded_records = []
@@ -95,6 +110,9 @@ def decode_raw_can(raw_df, db):
 
 
 def filter_obd2(raw_df, can_id = 0x7E8):
+
+    # Explaination: Filter raw CAN DataFrame to only OBD2 response frames.
+
     obd2_df = raw_df[raw_df["ID"]==can_id].copy()
     print (f"OBD2 Frames : {len(obd2_df)}  (ID= {can_id})")
 
@@ -105,6 +123,12 @@ def filter_obd2(raw_df, can_id = 0x7E8):
     return obd2_df
 
 def decode_obd2(obd2_df, obd2_db, can_id = 0x7E8):
+    
+    """
+    Explaination: Decode raw OBD2 frames into physical signal values. 
+    Automatically filters to real signals using DBC unit definitions.
+    """
+
     decoded_obd2_records = []
     for timestamp, row in obd2_df.iterrows():
         raw_bytes = bytes(row["DataBytes"])
@@ -124,7 +148,7 @@ def decode_obd2(obd2_df, obd2_db, can_id = 0x7E8):
     real_obd2_signals = []
     for message in obd2_db.messages:
         for sig in message.signals:
-            if sig.unit is not None: 
+            if sig.unit is not None:                   # Only keeping signals with meaningful units
                 real_obd2_signals.append(sig.name)
 
     obd2_signals_found = []
@@ -138,6 +162,9 @@ def decode_obd2(obd2_df, obd2_db, can_id = 0x7E8):
     return decoded_obd2_df, obd2_signals_found
 
 def signal_stats(decoded_obd2_df, obd2_signals_found):
+
+    # Explaination: Calculate and print descriptive statistics for each signal.Skips non-numeric columns automatically.
+
     stats_store = {}
     for signals in obd2_signals_found:
         stats = decoded_obd2_df[signals].dropna().describe()
@@ -156,6 +183,12 @@ def signal_stats(decoded_obd2_df, obd2_signals_found):
     return stats_store
 
 def combine_dataframes(decoded_df, signals_found, decoded_obd2_df, obd2_signals_found):
+
+    """
+    Explaination: Combine proprietary CAN and OBD2 DataFrames into one. 
+    Adds 'CAN_' prefix to proprietary signals and 'OBD2_' to OBD2 signals for clear distinction in analysis and export. 
+    """ 
+
     decoded_df = decoded_df.add_prefix("CAN_")
     decoded_obd2_df = decoded_obd2_df.add_prefix("OBD2_")
 
@@ -168,6 +201,9 @@ def combine_dataframes(decoded_df, signals_found, decoded_obd2_df, obd2_signals_
     return combined_df, combined_signals_found
 
 def signal_selector(combined_signals_found):
+
+    # Explaination: Open a GUI listbox for selecting which signals to plot.
+
     root = tk.Tk()
     root.title("Select Signals to Plot")
     root.geometry("400x500")
@@ -206,22 +242,29 @@ def signal_selector(combined_signals_found):
 
 def plot_signals(combined_df, signals, title='CAN Data'):
 
+    """
+    Explaination: Plot selected signals interactively using Plotly. Each signal gets its own subplot. Vertical spacing scales
+    automatically based on number of signals.
+    """
+
     colours = [
         'red', 'blue', 'green', 'indigo',
         'orange', 'purple', 'brown', 'pink', 'magenta', 'olive', 'darkgreen', 'darkblue'
     ]
-
+    
+    vertical_spacing = min(0.05, 1 / (len(signals) - 1) - 0.001) if len(signals) > 1 else 0.05
+    
     fig = make_subplots(
         rows             = len(signals),
         cols             = 1,
         shared_xaxes     = False,
         subplot_titles   = signals,
-        vertical_spacing = 0.1
+        vertical_spacing = vertical_spacing
     )
 
     for i, sig_name in enumerate(signals):
         sig_data = combined_df[sig_name].dropna()
-        colour   = colours[i % len(colours)]  # cycles through colours
+        colour   = colours[i % len(colours)]                               # cycles through colours
 
         fig.add_trace(
             go.Scatter(
@@ -262,6 +305,12 @@ def plot_signals(combined_df, signals, title='CAN Data'):
     fig.show()
         
 def file_save(combined_df, combined_signals_found):
+
+    """
+    Explaination: Save decoded signal data to a CSV file. Opens GUI dialogs for folder selection and filename input.
+    Only saves real signal columns.
+    """
+        
     root = tk.Tk()
     root.withdraw()
 
