@@ -10,9 +10,17 @@ import os
 
 def load_dbc(dbc_path):
     db = cantools.database.load_file(dbc_path)
-    print (f"DBC loaded : {dbc_path}")
-    print (f"Messages : {len(db.messages)}")
-    return db 
+    print (f"Propritery DBC loaded : {dbc_path}")
+    print (f"Propritery DBC Messages : {len(db.messages)}")
+
+    return db
+
+def load_obd2_dbc(obd2_dbc_path):
+    obd2_db = cantools.database.load_file(obd2_dbc_path)
+    print (f"OBD2 DBC loaded : {obd2_dbc_path}")
+    print (f"OBD2 DBC Messages : {len(obd2_db.messages)}")
+
+    return obd2_db
 
 def select_file():
     root = tk.Tk()
@@ -86,53 +94,53 @@ def decode_raw_can(raw_df, db):
     return decoded_df, signals_found
 
 
-# def filter_obd2(raw_df, can_id = 0x7E8):
-#     obd2_df = raw_df[raw_df["ID"]==can_id].copy()
-#     print (f"OBD2 Frames : {len(obd2_df)}  (ID= {can_id})")
+def filter_obd2(raw_df, can_id = 0x7E8):
+    obd2_df = raw_df[raw_df["ID"]==can_id].copy()
+    print (f"OBD2 Frames : {len(obd2_df)}  (ID= {can_id})")
 
-#     if obd2_df.empty:
-#         print ("No OBD2 frames found in the selected MF4 file")
-#         return None
+    if obd2_df.empty:
+        print ("No OBD2 frames found in the selected MF4 file")
+        return None
 
-#     return obd2_df
+    return obd2_df
 
-# def decode_obd2(obd2_df, db, can_id = 0x7E8):
-#     decoded_obd2_records = []
-#     for timestamp, row in obd2_df.iterrows():
-#         raw_bytes = bytes(row["DataBytes"])
+def decode_obd2(obd2_df, obd2_db, can_id = 0x7E8):
+    decoded_obd2_records = []
+    for timestamp, row in obd2_df.iterrows():
+        raw_bytes = bytes(row["DataBytes"])
 
-#         try: 
-#             decoded_obd2 = db.decode_message(can_id, data = raw_bytes, decode_choices = False)
-#             decoded_obd2["timestamps"] = timestamp
-#             decoded_obd2_records.append(decoded_obd2)
+        try: 
+            decoded_obd2 = obd2_db.decode_message(can_id, data = raw_bytes, decode_choices = False)
+            decoded_obd2["timestamps"] = timestamp
+            decoded_obd2_records.append(decoded_obd2)
 
-#         except Exception as e: 
-#             print(f"Could not decode frame at {timestamp:.4f}s : {e}")
-#             pass
+        except Exception as e: 
+            print(f"Could not decode frame at {timestamp:.4f}s : {e}")
+            pass
 
-#     decoded_obd2_df = pd.DataFrame(decoded_obd2_records)
-#     decoded_obd2_df = decoded_obd2_df.set_index("timestamps")
+    decoded_obd2_df = pd.DataFrame(decoded_obd2_records)
+    decoded_obd2_df = decoded_obd2_df.set_index("timestamps")
 
-#     real_obd2_signals = []
-#     for message in db.messages:
-#         for sig in message.signals:
-#             if sig.unit is not None: 
-#                 real_obd2_signals.append(sig.name)
+    real_obd2_signals = []
+    for message in obd2_db.messages:
+        for sig in message.signals:
+            if sig.unit is not None: 
+                real_obd2_signals.append(sig.name)
 
-#     obd2_signals_found = []
-#     for col in decoded_obd2_df.columns:
-#         if col in real_obd2_signals:
-#             obd2_signals_found.append(col)
+    obd2_signals_found = []
+    for col in decoded_obd2_df.columns:
+        if col in real_obd2_signals:
+            obd2_signals_found.append(col)
 
-#     print(f"Real signals found : {obd2_signals_found}")        
-#     print (f"Decoded Signals : {len(decoded_obd2_df)}")
+    print(f"Real signals found : {obd2_signals_found}")        
+    print (f"Decoded Signals : {len(decoded_obd2_df)}")
 
-#     return decoded_obd2_df, obd2_signals_found
+    return decoded_obd2_df, obd2_signals_found
 
-def signal_stats(decoded_df, signal_found):
+def signal_stats(decoded_obd2_df, obd2_signals_found):
     stats_store = {}
-    for signals in signal_found:
-        stats = decoded_df[signals].dropna().describe()
+    for signals in obd2_signals_found:
+        stats = decoded_obd2_df[signals].dropna().describe()
         stats_store[signals] = stats
 
     for sig_name, stats in stats_store.items():
@@ -147,7 +155,19 @@ def signal_stats(decoded_df, signal_found):
 
     return stats_store
 
-def signal_selector(signals_found):
+def combine_dataframes(decoded_df, signals_found, decoded_obd2_df, obd2_signals_found):
+    decoded_df = decoded_df.add_prefix("CAN_")
+    decoded_obd2_df = decoded_obd2_df.add_prefix("OBD2_")
+
+    signals_found = list(decoded_df.columns)                                   # used because all signals are included. 
+    obd2_signals_found = ["OBD2_" + col for col in obd2_signals_found]         # used because we filtered out the real signals in the decode_obd2 function. 
+
+    combined_df = pd.concat([decoded_df, decoded_obd2_df], axis = 0 )
+    combined_signals_found = signals_found + obd2_signals_found
+
+    return combined_df, combined_signals_found
+
+def signal_selector(combined_signals_found):
     root = tk.Tk()
     root.title("Select Signals to Plot")
     root.geometry("400x500")
@@ -162,7 +182,7 @@ def signal_selector(signals_found):
         )
     listbox.pack(pady=5)
 
-    for sig in signals_found:
+    for sig in combined_signals_found:
         listbox.insert(tk.END, sig)
 
     selected_signals = []
@@ -170,10 +190,11 @@ def signal_selector(signals_found):
     def on_confirm():
         selected_indices = listbox.curselection()
         for i in selected_indices:
-            selected_signals.append(signals_found[i])
+            selected_signals.append(combined_signals_found[i])
         root.quit()
 
     tk.Button(root, text="Confirm", command = on_confirm).pack(pady=5)
+    tk.Button(root, text = "Cancel", command = root.quit).pack(pady=5)
 
     
     root.mainloop()
@@ -183,7 +204,7 @@ def signal_selector(signals_found):
     
     return selected_signals
 
-def plot_signals(decoded_df, signals, title='CAN Data'):
+def plot_signals(combined_df, signals, title='CAN Data'):
 
     colours = [
         'red', 'blue', 'green', 'indigo',
@@ -195,11 +216,11 @@ def plot_signals(decoded_df, signals, title='CAN Data'):
         cols             = 1,
         shared_xaxes     = False,
         subplot_titles   = signals,
-        vertical_spacing = 0.01
+        vertical_spacing = 0.1
     )
 
     for i, sig_name in enumerate(signals):
-        sig_data = decoded_df[sig_name].dropna()
+        sig_data = combined_df[sig_name].dropna()
         colour   = colours[i % len(colours)]  # cycles through colours
 
         fig.add_trace(
@@ -216,7 +237,7 @@ def plot_signals(decoded_df, signals, title='CAN Data'):
 
     fig.update_layout(
         title         = title,
-        height        = 150 * len(signals),
+        height        = 250* len(signals),
         width         = 500 * len(signals),
         plot_bgcolor  = 'white',
         paper_bgcolor = 'white'
@@ -225,7 +246,7 @@ def plot_signals(decoded_df, signals, title='CAN Data'):
     fig.update_xaxes(
         showgrid  = True,
         gridcolor = 'black',
-        gridwidth = 0.5, 
+        gridwidth = 0.1, 
         layer     = 'below traces',
         title_text='Time (seconds)', 
         row=len(signals), 
@@ -234,13 +255,13 @@ def plot_signals(decoded_df, signals, title='CAN Data'):
     fig.update_yaxes(
         showgrid  = True,
         gridcolor = 'black',
-        gridwidth = 0.5,
+        gridwidth = 0.1,
         layer     = 'below traces',
 
     )
     fig.show()
         
-def file_save(decoded_df, signals_found):
+def file_save(combined_df, combined_signals_found):
     root = tk.Tk()
     root.withdraw()
 
@@ -260,7 +281,7 @@ def file_save(decoded_df, signals_found):
 
     file_path = os.path.join (folder_path, f"{file_name}.csv")
     
-    decoded_df[signals_found].to_csv(file_path)
+    combined_df[combined_signals_found].to_csv(file_path)
     print(f"Saved to : {file_path}")
-    print (f"Number of rows: {len(decoded_df)}")
-    print (f"Columns : {list(decoded_df.columns)}")
+    print (f"Number of rows: {len(combined_df)}")
+    print (f"Columns : {list(combined_df.columns)}")
