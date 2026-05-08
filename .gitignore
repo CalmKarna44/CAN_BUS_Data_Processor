@@ -1,8 +1,18 @@
-```
+# Virtual environment
 .venv/
+
+# Python cache
 __pycache__/
 *.pyc
 
 # Jupyter notebooks - testing only
+General_Python_Practice.ipynb
 CAN_Data_Processing.ipynb
 test.ipynb
+*.ipynb_checkpoints/
+
+# Data files - too large for GitHub
+*.MF4
+*.mf4
+*.csv
+*.dbc
