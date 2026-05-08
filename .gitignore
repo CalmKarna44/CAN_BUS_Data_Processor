@@ -5,14 +5,17 @@
 __pycache__/
 *.pyc
 
-# Jupyter notebooks - testing only
-General_Python_Practice.ipynb
-CAN_Data_Processing.ipynb
-test.ipynb
-*.ipynb_checkpoints/
+# Jupyter notebooks at root level
+*.ipynb
 
-# Data files - too large for GitHub
+# Other projects - hide from main view
+Damper_Dyno_Filter/
+Stock_Market_Analysis/
+TS_Karting_Practice2.py
+TS_MultiDriver_P2.py
+General_Python_Practice.ipynb
+
+# Data files
 *.MF4
 *.mf4
-*.csv
 *.dbc
