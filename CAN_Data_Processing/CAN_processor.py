@@ -7,16 +7,32 @@ from plotly.subplots import make_subplots
 import tkinter as tk 
 from tkinter import filedialog
 import os 
+import logging
+
+logging.basicConfig(
+    filename="CAN_processor_logfile.log",
+    filemode = "a", 
+    level= logging.DEBUG, 
+    format = "%(asctime)s | %(levelname)s | %(message)s", 
+    datefmt=  " %d-%m-%Y %H:%M:%S "
+)
+
+console = logging.StreamHandler()
+console.setLevel(logging.INFO)
+logging.getLogger().addHandler(console)
 
 def load_dbc(dbc_path):                                       
     
     # Explaination: Load the proprietary database to return cantools database for decoding all CAN Signals
- 
-    db = cantools.database.load_file(dbc_path)
-    print (f"Propritery DBC loaded : {dbc_path}")
-    print (f"Propritery DBC Messages : {len(db.messages)}")
-
-    return db
+    try:
+        db = cantools.database.load_file(dbc_path, strict = False)
+        logging.info(f"Propritery DBC loaded : {dbc_path}")
+        logging.info(f"Propritery DBC Messages : {len(db.messages)}")
+        return db
+    
+    except Exception as e: 
+        logging.error (f"Failed to load DBC: {dbc_path} : {e}")
+        return None 
 
 def load_obd2_dbc(obd2_dbc_path):    
 
@@ -50,21 +66,24 @@ def select_file():
 def load_mf4(mf4_path): 
 
     # Explaintion: Load an MF4 file and return a normalised raw CAN DataFrame. Column names are shortened by removing asammdf prefixes.
+    try: 
+        mdf = MDF(mf4_path)
+        raw_df = mdf.to_dataframe()
+        rename_map = {}
+        for col in raw_df.columns:
+            short_name = col.split('.')[-1]
+            rename_map[col] = short_name
+        raw_df = raw_df.rename(columns=rename_map)
 
-    mdf = MDF(mf4_path)
-    raw_df = mdf.to_dataframe()
-    rename_map = {}
-    for col in raw_df.columns:
-        short_name = col.split('.')[-1]
-        rename_map[col] = short_name
-        
-    raw_df = raw_df.rename(columns=rename_map)
+        logging.info (f"MF4 loaded : {mf4_path}")
+        logging.info (f"Total frames  : {len(raw_df)}")
+        logging.info (f"Time range    : {raw_df.index[0]}s → {raw_df.index[-1]}s")
 
-    print (f"MF4 loaded : {mf4_path}")
-    print(f"Total frames  : {len(raw_df)}")
-    print(f"Time range    : {raw_df.index[0]}s → {raw_df.index[-1]}s")
+        return raw_df
 
-    return raw_df
+    except Exception as e: 
+        logging.error(f"Failed to load MF4 file: {mf4_path} : {e}")
+        return None
 
 def decode_raw_can(raw_df, db):
 
@@ -91,6 +110,7 @@ def decode_raw_can(raw_df, db):
 
         except Exception as e:
             skipped += 1
+            logging.debug(f"Failed to decode frame {frame_id} : {e}")
     
     if not decoded_records:
         print("No frames were decoded — check DBC matches MF4")
@@ -139,7 +159,7 @@ def decode_obd2(obd2_df, obd2_db, can_id = 0x7E8):
             decoded_obd2_records.append(decoded_obd2)
 
         except Exception as e: 
-            print(f"Could not decode frame at {timestamp:.4f}s : {e}")
+            logging.debug(f"Could not decode frame at {timestamp:.4f}s : {e}")
             pass
 
     decoded_obd2_df = pd.DataFrame(decoded_obd2_records)

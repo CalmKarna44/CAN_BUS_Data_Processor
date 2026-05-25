@@ -19,3 +19,7 @@ General_Python_Practice.ipynb
 *.MF4
 *.mf4
 *.dbc
+
+# Log files
+logs/
+*.log
